@@ -163,7 +163,6 @@ class Q3SaveAnimationConfigOperator(bpy.types.Operator):
                             # Write the formatted output to the file
                             file.write(f"{start_frame}\t{num_frames}\t{looping_frames}\t{fps}\t\t// {name}\n")
 
-                            print("Is dead:", is_dead)
                             if is_dead:
                                 dead_name = rename_to_dead(name)
                                 file.write(f"{end_frame - 1}\t1\t0\t{fps}\t\t// {dead_name}\n")
