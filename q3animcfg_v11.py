@@ -15,7 +15,7 @@ import bpy
 import os
 
 class Q3AnimationConfigProperties(bpy.types.PropertyGroup):
-    selected_object: bpy.props.PointerProperty(name="Track source object", type=bpy.types.Object, description="Only consider the tracks of selected object (optional)")
+    selected_object: bpy.props.PointerProperty(name="Armature of model", type=bpy.types.Object, description="Only the NLA track of this armature will be used")
     sex_defined: bpy.props.EnumProperty(
         items=[
             ("sex n", "Neutral", ""),
@@ -63,8 +63,8 @@ class Q3AnimationConfigPanel(bpy.types.Panel):
         row.prop(q3_props, "selected_object", text="Armature")
         row = layout.row()
         row = layout.row()
-        row.operator("q3.import_actions", text="Compile Actions")
-        row.operator("q3.save_animation_config", text="Export Animation Config")
+        row.operator("q3.import_actions", text="Actions to NLA")
+        row.operator("q3.save_animation_config", text="Write Config File")
         row = layout.row()
         row.prop(context.scene.q3_animation_config, "crop_loops", text="Crop Loops")
 
@@ -82,7 +82,7 @@ class Q3SaveAnimationConfigOperator(bpy.types.Operator):
         q3_props = scene.q3_animation_config
         obj = q3_props.selected_object
         if not obj:
-            self.report({'ERROR'}, "Please select a source object")
+            self.report({'ERROR'}, "Please select an armature!")
             return {'CANCELLED'}
         
         # Define the output file path
@@ -171,6 +171,8 @@ class Q3SaveAnimationConfigOperator(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        #blend_file_name = bpy.path.display_name(bpy.context.blend_data.filepath)
+        self.filepath = "animation.cfg"
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
@@ -186,14 +188,14 @@ class Q3OpenCheatsheetOperator(bpy.types.Operator):
 class Q3ImportActionsOperator(bpy.types.Operator):
     bl_idname = "q3.import_actions"
     bl_label = "Import Actions"
-    bl_description = "Compile Actions on NLA for export"
+    bl_description = "Compile Actions on NLA for export. All other tracks will be removed on the selected armature."
     def execute(self, context):
         scene = context.scene
         q3_props = scene.q3_animation_config
         obj = q3_props.selected_object
 
         if not obj:
-            self.report({'ERROR'}, "Please select a source object")
+            self.report({'ERROR'}, "Please select an armature!")
             return {'CANCELLED'}
         
         for track in obj.animation_data.nla_tracks:
