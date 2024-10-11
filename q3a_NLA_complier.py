@@ -1,12 +1,12 @@
 bl_info = {
     "name": "Q3A - NLA Complier",
     "author": "Uzugijin",
-    "version": (1, 1, 0),
+    "version": (1, 2, 0),
     "blender": (4, 00, 0),
     "category": "Animation",
     "location": "Nonlinear Animation > Side panel (N) > Q3 Animation Config",
     "description": (
-        "Writes config file from NLA strips. Please see documentation for details."
+        "Puts actions onto NLA and can mark frames for easier distinction"
     ),
     "doc_url": "https://uzugijin.github.io",
 }
@@ -67,11 +67,6 @@ class Q3ImportActionsOperator(bpy.types.Operator):
                 if frame_buddy_name in obj2.name:
                     bpy.data.objects.remove(obj2)
 
-            # Delete meshes
-            for mesh in bpy.data.meshes:
-                if frame_buddy_name in mesh.name:
-                    bpy.data.meshes.remove(mesh)
-
             # Delete actions
             for action in bpy.data.actions:
                 if frame_buddy_name in action.name:
@@ -79,22 +74,14 @@ class Q3ImportActionsOperator(bpy.types.Operator):
 
         # Create a cube object
         if q3_props.mark_frames:
-            bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 0))
+            bpy.ops.object.empty_add(type='ARROWS', location=(0, 0, 0))
         else:
             bpy.ops.object.empty_add(type='PLAIN_AXES', location=(0, 0, 0))
         cube = bpy.context.active_object
         cube.name = frame_buddy_name
-        if q3_props.mark_frames:
-            cube.data.name = frame_buddy_name + "Mesh"
         cube.animation_data_create()
 
-        if not obj:
-            obj = cube
-            #self.report({'ERROR'}, "Please select an armature!")
-            #return {'CANCELLED'}
-        print("###########################################")
-        print(obj)
-        print("###########################################")
+        obj = cube
 
         for track in obj.animation_data.nla_tracks:
             obj.animation_data.nla_tracks.remove(track)
