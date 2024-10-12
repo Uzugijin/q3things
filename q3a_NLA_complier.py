@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Q3A - NLA Complier",
     "author": "Uzugijin",
-    "version": (1, 2, 0),
+    "version": (1, 3, 0),
     "blender": (4, 00, 0),
     "category": "Animation",
     "location": "Nonlinear Animation > Side panel (N) > Q3 Animation Config",
@@ -15,6 +15,7 @@ import bpy
 import os
 
 class Q3AnimationConfigProperties(bpy.types.PropertyGroup):
+    selected_object: bpy.props.PointerProperty(name="Armature of model", type=bpy.types.Object, description="Only the NLA track of this armature will be used")
     mark_frames: bpy.props.BoolProperty(name="Mark Frames", default=True, description="Mark the first frame of every strip in the NLA track")
     offset_by_1: bpy.props.BoolProperty(name="Offset By 1", default=True, description="Offset marks by 1 frame")
 class Q3AnimationConfigPanel(bpy.types.Panel):
@@ -27,7 +28,9 @@ class Q3AnimationConfigPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-
+        q3_props = scene.q3_animation_config
+        row = layout.row()
+        row.prop(q3_props, "selected_object", text="Armature")
         row = layout.row()
         row.prop(context.scene.q3_animation_config, "mark_frames", text="Mark Frames", toggle=False)
         if context.scene.q3_animation_config.mark_frames:
@@ -55,7 +58,13 @@ class Q3ImportActionsOperator(bpy.types.Operator):
     def execute(self, context):
         scene = context.scene
         q3_props = scene.q3_animation_config
-        obj = None
+        obj = q3_props.selected_object
+
+        for obj2 in bpy.data.objects:
+            if obj2.animation_data is not None:
+                for track in obj2.animation_data.nla_tracks:
+                    if track.name == "Q3ANIM":
+                        obj2.animation_data.nla_tracks.remove(track)
 
             # Check if a cube object already exists
         frame_buddy_name = "NLA-Compiler"
@@ -73,18 +82,27 @@ class Q3ImportActionsOperator(bpy.types.Operator):
                     bpy.data.actions.remove(action)
 
         # Create a cube object
-        if q3_props.mark_frames:
+        if q3_props.mark_frames and obj is None:
             bpy.ops.object.empty_add(type='ARROWS', location=(0, 0, 0))
-        else:
+            cube = bpy.context.active_object
+            cube.name = frame_buddy_name
+            cube.animation_data_create()
+            obj = cube
+        elif q3_props.mark_frames and obj is not None:
+            bpy.ops.object.empty_add(type='ARROWS', location=(0, 0, 0))
+            cube = bpy.context.active_object
+            cube.name = frame_buddy_name
+            cube.animation_data_create()
+        elif not q3_props.mark_frames and obj is None:
             bpy.ops.object.empty_add(type='PLAIN_AXES', location=(0, 0, 0))
-        cube = bpy.context.active_object
-        cube.name = frame_buddy_name
-        cube.animation_data_create()
+            cube = bpy.context.active_object
+            cube.name = frame_buddy_name
+            cube.animation_data_create()
+            obj = cube
+        elif not q3_props.mark_frames and obj is not None:
+            pass
 
-        obj = cube
 
-        for track in obj.animation_data.nla_tracks:
-            obj.animation_data.nla_tracks.remove(track)
 
         actions = [
             "BOTH_DEATH1", "BOTH_DEAD1", "BOTH_DEATH2", "BOTH_DEAD2", "BOTH_DEATH3", "BOTH_DEAD3",
