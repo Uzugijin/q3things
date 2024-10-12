@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Q3A - NLA Complier",
     "author": "Uzugijin",
-    "version": (1, 3, 0),
+    "version": (1, 4, 0),
     "blender": (4, 00, 0),
     "category": "Animation",
     "location": "Nonlinear Animation > Side panel (N) > Q3 Animation Config",
@@ -18,6 +18,7 @@ class Q3AnimationConfigProperties(bpy.types.PropertyGroup):
     selected_object: bpy.props.PointerProperty(name="Armature of model", type=bpy.types.Object, description="Only the NLA track of this armature will be used")
     mark_frames: bpy.props.BoolProperty(name="Mark Frames", default=True, description="Mark the first frame of every strip in the NLA track")
     offset_by_1: bpy.props.BoolProperty(name="Offset By 1", default=True, description="Offset marks by 1 frame")
+    trim_ends: bpy.props.BoolProperty(name="Trim Strips", default=True, description="Cut the end of loop strips in the NLA track")
 class Q3AnimationConfigPanel(bpy.types.Panel):
     bl_label = "Q3A NLA Compiler"
     bl_idname = "VIEW3D_PT_q3_animation_config"
@@ -36,6 +37,7 @@ class Q3AnimationConfigPanel(bpy.types.Panel):
         if context.scene.q3_animation_config.mark_frames:
             row.prop(context.scene.q3_animation_config, "offset_by_1", text="Offset By 1", toggle=True)
         row = layout.row()
+        row.prop(context.scene.q3_animation_config, "trim_ends", text="Trim Loops", toggle=False)
         row = layout.row()
         row.operator("q3.import_actions", text="(Re)Compile NLA")
 
@@ -116,13 +118,21 @@ class Q3ImportActionsOperator(bpy.types.Operator):
         track.name = "Q3ANIM"
         frame_offset = 0
 
+        trim_actions = [
+            "TORSO_STAND", "TORSO_STAND2", "LEGS_WALKCR", "LEGS_WALK", "LEGS_RUN", "LEGS_BACK", "LEGS_SWIM", "LEGS_IDLE", "LEGS_IDLECR", "LEGS_TURN"
+        ]
+
         for action_name in actions:
             action = bpy.data.actions.get(action_name)
             if action:
                 strip = track.strips.new(action_name, int(frame_offset), action)
                 strip.action = action
-                frame_offset += strip.frame_end - strip.frame_start
 
+                # Trim ends if enabled and action is in trim_actions list
+                if q3_props.trim_ends and action_name in trim_actions and strip.frame_end - strip.frame_start > 1:
+                    strip.frame_end -= 1
+
+                frame_offset += strip.frame_end - strip.frame_start
         bpy.context.scene.frame_end = int(frame_offset)
 
         if q3_props.mark_frames:
