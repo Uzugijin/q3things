@@ -1,6 +1,6 @@
 bl_info = {
     "name": "Trenchcoat",
-    "version": (1, 4, 1),
+    "version": (1, 4, 2),
     "blender": (4, 00, 0),
     "category": "Object",
     "location": "3D View > Sidebar > Tool > Trenchcoat",
@@ -183,7 +183,8 @@ class ConvertToMesh(bpy.types.Operator):
         bpy.ops.mesh.delete(type='FACE')
         bpy.ops.mesh.select_all(action='SELECT')
         try:
-            bpy.ops.uv.smart_project(island_margin=0.005)
+            if context.scene.unwrap:
+                bpy.ops.uv.smart_project(island_margin=0.005)
         except:
             self.report({'ERROR'}, "Mesh was too small for snapping!")
         bpy.ops.mesh.select_all(action='DESELECT')
@@ -263,7 +264,8 @@ class ConvertToMeshGroup(bpy.types.Operator):
             bpy.context.space_data.overlay.grid_scale = original_grid
     
         try:
-            bpy.ops.uv.smart_project(island_margin=0.005)
+            if context.scene.unwrap:
+                bpy.ops.uv.smart_project(island_margin=0.005)
         except:
             self.report({'ERROR'}, "Mesh was too small for snapping!")
         bpy.ops.mesh.select_all(action='DESELECT')
@@ -430,6 +432,7 @@ class OBJECT_PT_snap_all_to_grid_panel(bpy.types.Panel):
             row.label(text="Convert to:")
             if bpy.context.object.mode != 'EDIT':
                 row.prop(context.scene, "always_edit", text = "", icon="EDITMODE_HLT", toggle=True)
+            row.prop(context.scene, "unwrap", text = "", icon="UV", toggle=True)
 
             row = box.row(align=True)
                 #if there are more then one selected objects and are meshes:
@@ -470,6 +473,7 @@ class OBJECT_PT_snap_all_to_grid_panel(bpy.types.Panel):
             row = layout.row(align=True)
             row.operator("object.create_player_cube", text = "Spawn a Player Box at Cursor", icon="USER")
 
+
 classes = (
     OBJECT_PT_snap_all_to_grid_panel, #Panel
     OBJECT_OT_snap_selected_to_grid,
@@ -488,6 +492,7 @@ def register():
     bpy.types.Scene.snap = bpy.props.BoolProperty(name="Snap to Grid", default=True, description="Snapping ensures best conversion, but distorts rotation of mesh")
     bpy.types.Scene.snap_alone = bpy.props.BoolProperty(name="Only selected", default=False, description="Snap only the selected vertices")
     bpy.types.Scene.always_edit = bpy.props.BoolProperty(name="Always Edit", default=False, description="Always enter edit mode")
+    bpy.types.Scene.unwrap = bpy.props.BoolProperty(name="Unwrap", default=False, description="Automatically unwrap UVs (smart)")
     bpy.types.Scene.grid_size = bpy.props.IntProperty(
     name="Grid Size",
     default=8,
@@ -506,6 +511,7 @@ def unregister():
     del bpy.types.Scene.mirror_axis
     del bpy.types.Scene.world_center
     del bpy.types.Scene.always_edit
+    del bpy.types.Scene.unwrap
 
 if __name__ == "__main__":
     register()
