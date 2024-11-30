@@ -1,6 +1,6 @@
 bl_info = {
     "name": "Trenchcoat",
-    "version": (1, 4, 0),
+    "version": (1, 4, 1),
     "blender": (4, 00, 0),
     "category": "Object",
     "location": "3D View > Sidebar > Tool > Trenchcoat",
@@ -148,6 +148,8 @@ class OBJECT_OT_snap_selected_to_grid(bpy.types.Operator):
                     bpy.ops.mesh.select_all(action='SELECT')
                 bpy.context.space_data.overlay.grid_scale = grid_size
                 bpy.ops.view3d.snap_selected_to_grid()
+                #remove doubles
+                bpy.ops.mesh.remove_doubles()
                 bpy.context.space_data.overlay.grid_scale = original_grid
                 if context.scene.snap_alone == False:
                     bpy.ops.mesh.select_all(action='DESELECT')
@@ -165,6 +167,7 @@ class ConvertToMesh(bpy.types.Operator):
         grid_size = context.scene.grid_size
         original_grid = bpy.context.space_data.overlay.grid_scale
         original_mode = bpy.context.object.mode
+        bpy.ops.object.mode_set(mode='OBJECT')
 
         bpy.ops.object.convert(target='MESH')
         bpy.ops.object.join()
@@ -173,15 +176,14 @@ class ConvertToMesh(bpy.types.Operator):
         if context.scene.snap:
             bpy.context.space_data.overlay.grid_scale = grid_size
             bpy.ops.view3d.snap_selected_to_grid()
-            bpy.context.space_data.overlay.grid_scale = original_grid
-        bpy.ops.mesh.remove_doubles()       
+            bpy.context.space_data.overlay.grid_scale = original_grid      
         bpy.ops.mesh.select_all(action='DESELECT')
         bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='VERT')
         bpy.ops.mesh.select_non_manifold()
         bpy.ops.mesh.delete(type='FACE')
         bpy.ops.mesh.select_all(action='SELECT')
         try:
-            bpy.ops.uv.smart_project(island_margin=0.05)
+            bpy.ops.uv.smart_project(island_margin=0.005)
         except:
             self.report({'ERROR'}, "Mesh was too small for snapping!")
         bpy.ops.mesh.select_all(action='DESELECT')
@@ -191,6 +193,9 @@ class ConvertToMesh(bpy.types.Operator):
         obj["is_brush"] = False
         obj.name = "Mesh"
         obj.data.name = "Mesh"
+        cleanup_floating_verts(obj)
+        bpy.ops.mesh.delete(type='VERT')
+        
         if not context.scene.always_edit:
             bpy.ops.object.mode_set(mode=original_mode)
         return {'FINISHED'}
@@ -209,6 +214,7 @@ class ConvertToMeshGroup(bpy.types.Operator):
         original_grid = bpy.context.space_data.overlay.grid_scale
         original_mode = bpy.context.object.mode
 
+        bpy.ops.object.mode_set(mode='OBJECT')
         bpy.ops.object.convert(target='MESH')
 
         # 0. separate objects to a new collection
@@ -243,12 +249,9 @@ class ConvertToMeshGroup(bpy.types.Operator):
             bpy.data.objects.remove(obj2, do_unlink=True)
         
         bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_loose()
-        bpy.ops.mesh.delete(type='VERT')
         bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.mesh.quads_convert_to_tris(quad_method='BEAUTY', ngon_method='BEAUTY')
         bpy.ops.mesh.tris_convert_to_quads()
-        bpy.ops.mesh.remove_doubles()
         bpy.ops.mesh.select_all(action='DESELECT')
         bpy.ops.mesh.select_interior_faces()
         bpy.ops.mesh.delete(type='FACE')
@@ -260,7 +263,7 @@ class ConvertToMeshGroup(bpy.types.Operator):
             bpy.context.space_data.overlay.grid_scale = original_grid
     
         try:
-            bpy.ops.uv.smart_project(island_margin=0.05)
+            bpy.ops.uv.smart_project(island_margin=0.005)
         except:
             self.report({'ERROR'}, "Mesh was too small for snapping!")
         bpy.ops.mesh.select_all(action='DESELECT')
@@ -270,6 +273,8 @@ class ConvertToMeshGroup(bpy.types.Operator):
         obj["is_brush"] = False
         obj.name = "Mesh"
         obj.data.name = "Mesh"
+        cleanup_floating_verts(obj)
+        bpy.ops.mesh.delete(type='VERT')
         if not context.scene.always_edit:
             bpy.ops.object.mode_set(mode=original_mode)
         return {'FINISHED'}
@@ -287,6 +292,8 @@ class ConvexHullBrush(bpy.types.Operator):
         snap = context.scene.snap
         original_grid = bpy.context.space_data.overlay.grid_scale
         original_mode = bpy.context.object.mode
+
+        bpy.ops.object.mode_set(mode='OBJECT')
 
         if obj.type == 'MESH':
             if context.scene.automerge:
@@ -374,6 +381,18 @@ class CreatePlayerCube(bpy.types.Operator):
 
         return {'FINISHED'}
 
+def cleanup_floating_verts(obj):
+    mesh = obj.data
+    bm = bmesh.from_edit_mesh(mesh)
+    # Iterate over the vertices
+    for v in bm.verts:
+        # Check if the vertex has no edges connected to it
+        if len(v.link_edges) == 0:
+            v.select_set(True)
+        print(len(v.link_edges))
+    bmesh.update_edit_mesh(mesh)
+    bm.free()
+
 class OBJECT_PT_snap_all_to_grid_panel(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
     bl_label = "Trenchcoat"
@@ -391,8 +410,8 @@ class OBJECT_PT_snap_all_to_grid_panel(bpy.types.Panel):
                 modifier = obj.modifiers.get("SplitUpCurve")
             except:
                 pass
-            if bpy.context.object.mode == 'EDIT':
-                box = layout.box()
+            box = layout.box()
+            if bpy.context.object.mode == 'EDIT':               
                 box.operator("object.set_origin_to_selected", text = "Set Origin", icon="CURSOR")
                 row = box.row(align=True)
                 row.operator("object.snap_selected_to_grid", text = "Snap Vertices to Grid", icon="SNAP_GRID")
@@ -400,29 +419,32 @@ class OBJECT_PT_snap_all_to_grid_panel(bpy.types.Panel):
                     row.prop(context.scene, "snap_alone", text = "", icon="TRACKER", toggle=True)
                 else:
                     row.prop(context.scene, "snap_alone", text = "", icon="TRACKER", toggle=True)
+                
+            row = box.row(align=True)
+            row.operator("object.convexhull_brush", text = "Make Brush", icon="SNAP_VOLUME")
+            if context.scene.automerge:
+                row.prop(context.scene, "automerge", text = "", icon="AUTOMERGE_ON", toggle=True)
             else:
-                box = layout.box()
+                row.prop(context.scene, "automerge", text = "", icon="AUTOMERGE_OFF", toggle=True)
+            row = box.row(align=True)
+            row.label(text="Convert to:")
+            if bpy.context.object.mode != 'EDIT':
+                row.prop(context.scene, "always_edit", text = "", icon="EDITMODE_HLT", toggle=True)
+
+            row = box.row(align=True)
+                #if there are more then one selected objects and are meshes:
+            if len(context.selected_objects) > 1 and len([o for o in context.selected_objects if o.type == 'MESH']) == len(context.selected_objects):
+                row.operator("object.convert_to_mesh", text = "Mesh", icon="MESH_DATA")
+                row.operator("object.convert_to_mesh_group", text = "Union", icon="MESH_ICOSPHERE")
+            else:
+                row.operator("object.convert_to_mesh", text = "Mesh", icon="MESH_DATA")
+                #box = layout.box()
                 if modifier is not None and obj.type == 'CURVE':
                     box.operator("object.convexhull_brush", text = "2. Apply Split") 
                 elif obj.type == 'CURVE':
                     box.operator("object.convexhull_brush", text = "1. Split Curve")
                 else:
-                    row = box.row(align=True)
-                    row.operator("object.convexhull_brush", text = "Make Brush", icon="SNAP_VOLUME")
-                    if context.scene.automerge:
-                        row.prop(context.scene, "automerge", text = "", icon="AUTOMERGE_ON", toggle=True)
-                    else:
-                        row.prop(context.scene, "automerge", text = "", icon="AUTOMERGE_OFF", toggle=True)
-                    row = box.row(align=True)
-                    row.label(text="Convert to:")
-                    row.prop(context.scene, "always_edit", text = "", icon="EDITMODE_HLT", toggle=True)
-                    row = box.row(align=True)
-                    #if there are more then one selected objects and are meshes:
-                    if len(context.selected_objects) > 1 and len([o for o in context.selected_objects if o.type == 'MESH']) == len(context.selected_objects):
-                        row.operator("object.convert_to_mesh", text = "Mesh", icon="MESH_DATA")
-                        row.operator("object.convert_to_mesh_group", text = "Union", icon="MESH_ICOSPHERE")
-                    else:
-                        row.operator("object.convert_to_mesh", text = "Mesh", icon="MESH_DATA")
+
                     row = layout.row(align=True)
                     row.operator("object.create_player_cube", text = "Convert to Player Box", icon="USER")
                     row = layout.row(align=True)
